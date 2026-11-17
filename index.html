@@ -201,22 +201,37 @@ function notify(t,b){toast('⏰ '+t+' — '+b);vib();try{if('Notification' in wi
 function chk(){const now=Date.now();let ch=0;for(const e of S.events){if(e.fired||!e.time||e.rem<0)continue;const at=new Date(e.date+'T'+e.time).getTime();if(now>=at+36e5){e.fired=1;ch=1}else if(now>=at-e.rem*6e4){e.fired=1;ch=1;notify(e.title,e.rem?'Começa em '+(e.rem>=1440?'1 dia':e.rem+' min')+' (às '+e.time+')':'Agora, às '+e.time)}}if(ch)save()}
 setInterval(chk,20000);chk();
 function askN(){try{Notification.requestPermission().then(render)}catch(e){}}
+let cm=TODAY.slice(0,7),eid=null;
+function cmv(n){const [y,m]=cm.split('-').map(Number),d=new Date(y,m-1+n,1);cm=d.getFullYear()+'-'+z2(d.getMonth()+1);render()}
+function pick(k){ad=k;eid=null;render()}
+function cal(){
+ const [y,m]=cm.split('-').map(Number),n=new Date(y,m,0).getDate(),f=new Date(y,m-1,1).getDay(),nm=new Date(y,m-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+ let c='';for(let i=0;i<f;i++)c+='<div></div>';
+ for(let d=1;d<=n;d++){const k=cm+'-'+z2(d),cnt=S.events.filter(e=>e.date===k&&!e.done).length,st=(k===ad?'background:var(--pri);color:#fff;':'')+(k===TODAY?'outline:2px solid var(--pri2);':'');
+  c+=`<button onclick="pick('${k}')" style="min-height:44px;padding:0;border-radius:12px;background:#1c1c28;color:var(--tx);font-weight:600;position:relative;${st}">${d}${cnt?`<i style="position:absolute;bottom:5px;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:${k===ad?'#fff':'var(--pri2)'}"></i>`:''}</button>`}
+ return `<div class="card"><div class="row sp"><button class="g" onclick="cmv(-1)">‹</button><b style="text-transform:capitalize">${nm}</b><button class="g" onclick="cmv(1)">›</button></div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px;text-align:center">${['D','S','T','Q','Q','S','S'].map(x=>`<span class="sub" style="margin:0">${x}</span>`).join('')}${c}</div><div class="sub" style="margin:8px 0 0">Bolinha = dia com compromisso. Toque num dia para ver ou adicionar.</div></div>`}
 function agenda(){
- const key=e=>e.date+(e.time||'00:00'),lbl=ad===TODAY?'Hoje':ad===shift(TODAY,1)?'Amanhã':ad===shift(TODAY,-1)?'Ontem':new Date(ad+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'});
+ const key=e=>e.date+(e.time||'00:00'),lbl=ad===TODAY?'Hoje':ad===shift(TODAY,1)?'Amanhã':ad===shift(TODAY,-1)?'Ontem':new Date(ad+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+ const E=S.events.find(x=>x.id===eid)||{title:'',date:ad,time:'',rem:10};
  const list=S.events.filter(e=>e.date===ad).sort((a,b)=>key(a).localeCompare(key(b))),nx=S.events.filter(e=>e.date>=TODAY&&e.date!==ad&&!e.done).sort((a,b)=>key(a).localeCompare(key(b))).slice(0,5);
  const perm='Notification' in window?Notification.permission:'x';
  let h=`<h1>Agenda</h1><div class="sub">Compromissos com horário e lembrete</div>`;
  if(perm==='default')h+=`<div class="card row sp" style="padding:10px 12px;font-size:13px"><span>🔔 Ative as notificações para receber lembretes</span><button style="min-height:36px" onclick="askN()">Ativar</button></div>`;
  else if(perm==='denied')h+=`<div class="sub">🔕 Notificações bloqueadas no navegador: os lembretes aparecem só dentro do app.</div>`;
- h+=`<div class="row sp card"><button class="g" onclick="ad=shift(ad,-1);render()">‹</button><b>${lbl}</b><button class="g" onclick="ad=shift(ad,1);render()">›</button></div>
- <div class="card"><div class="grid"><input id="et" placeholder="Compromisso (ex.: Dentista)" style="grid-column:1/3" onkeydown="if(event.key=='Enter')addE()"><input id="eh" type="time"><select id="er"><option value="-1">Sem lembrete</option><option value="0">No horário</option><option value="10" selected>10 min antes</option><option value="30">30 min antes</option><option value="60">1 hora antes</option><option value="1440">1 dia antes</option></select></div><button style="width:100%;margin-top:8px" onclick="addE()">Adicionar à agenda</button></div>`;
+ h+=cal();
+ h+=`<div class="card" ${eid?'style="border-color:var(--pri)"':''}><b>${eid?'✏️ Editar compromisso':'➕ Novo compromisso'}</b><div class="grid" style="margin-top:8px"><input id="et" value="${esc(E.title)}" placeholder="Compromisso (ex.: Dentista)" style="grid-column:1/3" onkeydown="if(event.key=='Enter')addE()"><input id="ex" type="date" value="${E.date}"><input id="eh" type="time" value="${E.time||''}"><select id="er" style="grid-column:1/3">${[[-1,'Sem lembrete'],[0,'No horário'],[10,'10 min antes'],[30,'30 min antes'],[60,'1 hora antes'],[1440,'1 dia antes']].map(o=>`<option value="${o[0]}" ${o[0]==E.rem?'selected':''}>${o[1]}</option>`).join('')}</select></div><div class="row" style="margin-top:8px"><button style="flex:1" onclick="addE()">${eid?'Salvar alterações':'Adicionar à agenda'}</button>${eid?'<button class="g" onclick="eid=null;render()">Cancelar</button>':''}</div></div>`;
+ h+=`<h2 style="margin:6px 0 8px;text-transform:capitalize">${lbl}</h2>`;
  if(!list.length)h+='<div class="empty">Nada marcado para este dia.</div>';
- for(const e of list)h+=`<div class="card row ${e.done?'done':''}"><button class="chk ${e.done?'on':''}" onclick="te('${e.id}')">${e.done?'✓':''}</button><div class="t"><b style="color:var(--pri2)">${e.time||'Dia todo'}</b> ${esc(e.title)}${e.rem>=0&&e.time?' 🔔':''}</div><button class="x" onclick="delE('${e.id}')">🗑</button></div>`;
- if(nx.length)h+=`<h2 style="margin:18px 0 8px">Próximos compromissos</h2>`+nx.map(e=>`<div class="card row sp" style="padding:10px 12px"><span class="t">${esc(e.title)}</span><span class="sub" style="margin:0">${e.date.split('-').reverse().slice(0,2).join('/')} ${e.time}</span></div>`).join('');
+ for(const e of list)h+=`<div class="card row ${e.done?'done':''}" ${e.id===eid?'style="border-color:var(--pri)"':''}><button class="chk ${e.done?'on':''}" onclick="te('${e.id}')">${e.done?'✓':''}</button><div class="t" onclick="ed('${e.id}')"><b style="color:var(--pri2)">${e.time||'Dia todo'}</b> ${esc(e.title)}${e.rem>=0&&e.time?' 🔔':''}</div><button class="g" style="padding:0 12px" onclick="ed('${e.id}')">✏️</button><button class="g" style="padding:0 12px" onclick="delE('${e.id}')">🗑</button></div>`;
+ if(nx.length)h+=`<h2 style="margin:18px 0 8px">Próximos compromissos</h2>`+nx.map(e=>`<div class="card row sp" style="padding:10px 12px" onclick="ed('${e.id}')"><span class="t">${esc(e.title)}</span><span class="sub" style="margin:0">${e.date.split('-').reverse().slice(0,2).join('/')} ${e.time}</span></div>`).join('');
  return h+'<div class="sub" style="margin-top:12px">Os lembretes disparam com o app aberto ou em segundo plano. Com o app totalmente fechado o navegador pode não avisar.</div>'}
-function addE(){const t=document.getElementById('et').value.trim();if(!t)return;const hh=document.getElementById('eh').value;let r=+document.getElementById('er').value;if(!hh)r=-1;S.events.push({id:uid(),date:ad,time:hh,title:t,rem:r,done:0});save();render()}
+function ed(id){const e=S.events.find(x=>x.id===id);eid=id;ad=e.date;cm=ad.slice(0,7);render();scrollTo(0,0)}
+function addE(){const t=document.getElementById('et').value.trim();if(!t)return alert('Digite o nome do compromisso.');const dt=document.getElementById('ex').value||ad,hh=document.getElementById('eh').value;let r=+document.getElementById('er').value;if(!hh)r=-1;
+ if(eid){const e=S.events.find(x=>x.id===eid);Object.assign(e,{title:t,date:dt,time:hh,rem:r,fired:0});eid=null}else S.events.push({id:uid(),date:dt,time:hh,title:t,rem:r,done:0});
+ ad=dt;cm=dt.slice(0,7);save();render()}
+function delE(id){if(!confirm('Excluir este compromisso?'))return;S.events=S.events.filter(x=>x.id!==id);if(eid===id)eid=null;save();render()}
 function te(id){const e=S.events.find(x=>x.id===id);e.done=e.done?0:1;vib();save();render()}
-function delE(id){S.events=S.events.filter(x=>x.id!==id);save();render()}
+
 function pe(t){return String(t).replace(/[\u{1F000}-\u{1FFFF}\u2600-\u27BF\uFE0F]/gu,'').replace(/[\\()]/g,'\\$&').replace(/[^\x20-\x7e]/g,c=>{const n=c.charCodeAt(0);return n<256?'\\'+n.toString(8).padStart(3,'0'):'?'})}
 function mkpdf(L){const P=[];let c=[],y=800;
  L.forEach(l=>{const s=l.s||11;if(y<60){P.push(c);c=[];y=800}c.push('BT /'+(l.b?'F2':'F1')+' '+s+' Tf 40 '+y+' Td ('+pe(l.t)+') Tj ET');y-=s+7});P.push(c);
