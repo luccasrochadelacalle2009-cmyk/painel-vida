@@ -26,7 +26,7 @@ button:active{transform:scale(.96)}
 .stat b{display:block;font-size:20px;color:var(--pri2)}.stat span{font-size:11px;color:var(--mut)}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
 nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:#101018ee;backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));z-index:5}
-nav button{flex:1;background:none;color:var(--mut);display:flex;flex-direction:column;gap:2px;font-size:11px;padding:4px 0;min-height:52px}
+nav button{flex:1;background:none;color:var(--mut);display:flex;flex-direction:column;gap:2px;font-size:10px;padding:4px 0;min-height:52px}
 nav button span{font-size:20px}nav button.on{color:var(--pri2)}
 .empty{text-align:center;color:var(--mut);padding:24px 8px}
 .pop{animation:p .3s}@keyframes p{50%{transform:scale(1.04)}}
@@ -37,7 +37,7 @@ nav button span{font-size:20px}nav button.on{color:var(--pri2)}
 <nav id="nav"></nav>
 <script>
 const K='painel-vida-v1';
-let S={habits:[],tasks:[],goals:[],workouts:[],meals:[],water:{}},tab='habits',day=iso(new Date()),dirty=0;
+let S={habits:[],tasks:[],goals:[],workouts:[],meals:[],water:{},events:[]},tab='habits',day=iso(new Date()),dirty=0;
 try{const r=localStorage.getItem(K);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
 function save(){try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}}
 function iso(d){const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())}
@@ -123,22 +123,25 @@ function tt(id){const t=S.tasks.find(x=>x.id===id);t.done=t.done?0:1;vib();save(
 function dt(id){S.tasks=S.tasks.filter(x=>x.id!==id);save();render()}
 function mv(){S.tasks.forEach(t=>{if(t.date<TODAY&&!t.done)t.date=TODAY});save();render()}
 
+const GC={fin:['💰','Financeira','#22c55e'],cor:['💪','Corporal','#f97316'],est:['📚','Estudos','#38bdf8'],pes:['✨','Pessoal','#ec4899'],out:['🎯','Outra','#a78bfa']};
 function goals(){
- let h=`<h1>Metas</h1><div class="sub">Financeiras, corporais ou qualquer outra</div>
- <div class="card"><b>Nova meta</b><div class="grid"><input id="gn" placeholder="Nome (ex.: Juntar R$ 10.000)" style="grid-column:1/3"><input id="gu" placeholder="Unidade (R$, kg…)"><input id="gs" type="number" inputmode="decimal" placeholder="Valor inicial"><input id="gt" type="number" inputmode="decimal" placeholder="Valor alvo" style="grid-column:1/3"></div><button style="width:100%;margin-top:8px" onclick="addG()">Criar meta</button></div>`;
+ let h=`<h1>Metas</h1><div class="sub">Defina, acompanhe e conquiste</div>
+ <details class="card" ${S.goals.length?'':'open'}><summary style="cursor:pointer;font-weight:700;min-height:28px">➕ Nova meta</summary><div class="grid" style="margin-top:10px"><input id="gn" placeholder="Nome (ex.: Juntar R$ 10.000)" style="grid-column:1/3"><select id="gc">${Object.keys(GC).map(k=>`<option value="${k}">${GC[k][0]} ${GC[k][1]}</option>`).join('')}</select><input id="gd" type="date" value="${TODAY.slice(0,4)}-12-31"><input id="gu" placeholder="Unidade (R$, kg…)"><input id="gs" type="number" inputmode="decimal" placeholder="Valor inicial"><input id="gt" type="number" inputmode="decimal" placeholder="Valor alvo" style="grid-column:1/3"></div><button style="width:100%;margin-top:8px" onclick="addG()">Criar meta</button></details>`;
  if(!S.goals.length)h+='<div class="empty">Nenhuma meta ainda.</div>';
  for(const g of S.goals){
-  const cur=g.logs.length?g.logs[g.logs.length-1].v:g.start,span=g.target-g.start,pct=span?Math.max(0,Math.min(100,(cur-g.start)/span*100)):0;
-  const pts=[{v:g.start},...g.logs].map(l=>l.v),mn=Math.min(...pts,g.target),mx=Math.max(...pts,g.target),r=mx-mn||1;
-  const line=pts.map((v,i)=>`${pts.length>1?i/(pts.length-1)*280+10:150},${60-(v-mn)/r*50}`).join(' ');
-  h+=`<div class="card"><div class="row sp"><b>${esc(g.name)}</b><button class="x" onclick="delG('${g.id}')">🗑</button></div>
-  <div class="row sp"><span>${cur} ${esc(g.unit)}</span><span class="sub" style="margin:0">alvo ${g.target} ${esc(g.unit)}</span></div>
-  <div class="bar"><i style="width:${pct}%"></i></div><div class="sub" style="margin:0">${Math.round(pct)}% · faltam ${+(Math.abs(g.target-cur)).toFixed(2)} ${esc(g.unit)}</div>
-  <svg viewBox="0 0 300 70" width="100%" style="margin-top:8px"><polyline fill="none" stroke="#a78bfa" stroke-width="2.5" stroke-linejoin="round" points="${line}"/></svg>
-  <div class="row"><input id="l${g.id}" type="number" inputmode="decimal" placeholder="Valor atual de hoje"><button onclick="logG('${g.id}')">Lançar</button></div>
+  const [em,cn,col]=GC[g.cat||'out'],cur=g.logs.length?g.logs[g.logs.length-1].v:g.start,span=g.target-g.start,pct=span?Math.max(0,Math.min(100,(cur-g.start)/span*100)):0,left=+Math.abs(g.target-cur).toFixed(2);
+  const dl=g.due?Math.ceil((new Date(g.due+'T12:00:00')-new Date(TODAY+'T12:00:00'))/864e5):null,R=34,C=2*Math.PI*R;
+  const pts=[{v:g.start},...g.logs].map(l=>l.v),mn=Math.min(...pts,g.target),mx=Math.max(...pts,g.target),r=mx-mn||1,n=pts.length;
+  const xy=pts.map((v,i)=>[n>1?10+i/(n-1)*280:150,64-(v-mn)/r*52]),line=xy.map(p=>p.join(',')).join(' '),area='10,70 '+line+' '+xy[n-1][0]+',70',ty=64-(g.target-mn)/r*52;
+  h+=`<div class="card" style="border-color:${col}55;background:linear-gradient(160deg,${col}22,var(--card) 55%)">
+  <div class="row sp"><span style="background:${col}33;color:${col};padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700">${em} ${cn}</span><button class="x" onclick="delG('${g.id}')">🗑</button></div>
+  <div class="row" style="margin-top:10px"><svg width="84" height="84" viewBox="0 0 84 84" style="flex:none"><circle cx="42" cy="42" r="${R}" fill="none" stroke="#272736" stroke-width="8"/><circle cx="42" cy="42" r="${R}" fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${C*pct/100} ${C}" transform="rotate(-90 42 42)"/><text x="42" y="47" text-anchor="middle" fill="#fff" font-size="16" font-weight="700">${Math.round(pct)}%</text></svg><div class="t"><h2>${esc(g.name)}</h2><div class="sub" style="margin:2px 0 0">${pct>=100?'🏆 Meta concluída!':'Faltam '+left+' '+esc(g.unit)}</div></div></div>
+  <div class="stat" style="margin:12px 0 8px"><div><b style="color:${col}">${cur}</b><span>atual (${esc(g.unit)})</span></div><div><b>${g.target}</b><span>alvo</span></div><div><b>${dl===null?'—':Math.max(0,dl)}</b><span>dias restantes</span></div></div>
+  <svg viewBox="0 0 300 76" width="100%"><defs><linearGradient id="gr${g.id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".35"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs><line x1="10" x2="290" y1="${ty}" y2="${ty}" stroke="${col}" stroke-dasharray="4 4" opacity=".5"/><polygon points="${area}" fill="url(#gr${g.id})"/><polyline fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" points="${line}"/>${xy.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="${col}"/>`).join('')}</svg>
+  <div class="row" style="margin-top:8px"><input id="l${g.id}" type="number" inputmode="decimal" placeholder="Valor atual de hoje"><button style="background:${col}" onclick="logG('${g.id}')">Lançar</button></div>
   ${g.logs.slice(-3).reverse().map(l=>`<div class="sub" style="margin:6px 0 0">${l.d.split('-').reverse().join('/')} → ${l.v} ${esc(g.unit)}</div>`).join('')}</div>`}
  return h}
-function addG(){const q=i=>document.getElementById(i).value,n=q('gn').trim(),s=parseFloat(q('gs')),t=parseFloat(q('gt'));if(!n||isNaN(s)||isNaN(t))return alert('Preencha nome, valor inicial e alvo.');S.goals.push({id:uid(),name:n,unit:q('gu').trim(),start:s,target:t,logs:[]});save();render()}
+function addG(){const q=i=>document.getElementById(i).value,n=q('gn').trim(),s=parseFloat(q('gs')),t=parseFloat(q('gt'));if(!n||isNaN(s)||isNaN(t))return alert('Preencha nome, valor inicial e alvo.');S.goals.push({id:uid(),name:n,cat:q('gc'),due:q('gd')||TODAY.slice(0,4)+'-12-31',unit:q('gu').trim(),start:s,target:t,logs:[]});save();render()}
 function logG(id){const v=parseFloat(document.getElementById('l'+id).value);if(isNaN(v))return;const g=S.goals.find(x=>x.id===id);g.logs.push({d:TODAY,v});vib();save();render()}
 function delG(id){if(confirm('Excluir esta meta?')){S.goals=S.goals.filter(x=>x.id!==id);save();render()}}
 
@@ -159,11 +162,11 @@ function doW(id){const w=S.workouts.find(x=>x.id===id);if(w.done[TODAY])delete w
 function delW(id){if(confirm('Excluir esta ficha?')){S.workouts=S.workouts.filter(x=>x.id!==id);save();render()}}
 
 function dieta(){
- const ml=S.meals,wd=S.water[TODAY]||0,goal=2000,n=ml.filter(m=>m.done[TODAY]).length;
+ const ml=S.meals,wd=S.water[TODAY]||0,goal=S.wgoal||2000,n=ml.filter(m=>m.done[TODAY]).length;
  const kc=ml.filter(m=>m.done[TODAY]).reduce((a,m)=>a+(m.kcal||0),0),plan=ml.reduce((a,m)=>a+(m.kcal||0),0);
  const ad=ml.length?Math.round([0,1,2,3,4,5,6].reduce((a,i)=>a+ml.filter(m=>m.done[shift(TODAY,-i)]).length,0)/(ml.length*7)*100):0;
- let h=`<h1>Dieta</h1><div class="sub">Monte seu plano e marque cada refeição cumprida</div><div class="stat"><div><b>${n}/${ml.length}</b><span>refeições hoje</span></div><div><b>${kc}</b><span>kcal de ${plan}</span></div><div><b>${ad}%</b><span>adesão 7 dias</span></div></div>
- <div class="card"><div class="row sp"><b>💧 Água</b><span>${wd} / ${goal} ml</span></div><div class="bar"><i style="width:${Math.min(100,wd/goal*100)}%"></i></div><div class="row"><button class="g" style="flex:1" onclick="wt(-250)">−250</button><button style="flex:1" onclick="wt(250)">+250 ml</button><button style="flex:1" onclick="wt(500)">+500 ml</button></div></div>
+ let h=`<h1>Dieta</h1><div class="sub">Monte seu plano e marque cada refeição cumprida</div><button class="g" style="width:100%;margin-bottom:12px" onclick="pdfDieta()">📄 Exportar dieta em PDF</button><div class="stat"><div><b>${n}/${ml.length}</b><span>refeições hoje</span></div><div><b>${kc}</b><span>kcal de ${plan}</span></div><div><b>${ad}%</b><span>adesão 7 dias</span></div></div>
+ <div class="card"><div class="row sp"><b>💧 Água</b><span class="row" style="gap:4px"><input type="number" inputmode="numeric" value="${wd}" style="width:78px;min-height:36px;padding:0 6px" onchange="S.water[TODAY]=Math.max(0,+this.value||0);save();render()"> / <input type="number" inputmode="numeric" value="${goal}" style="width:78px;min-height:36px;padding:0 6px" onchange="S.wgoal=+this.value||2000;save();render()"> ml</span></div><div class="sub" style="margin:0">Toque nos números para editar o consumo de hoje e a meta diária.</div><div class="bar"><i style="width:${Math.min(100,wd/goal*100)}%"></i></div><div class="row"><button class="g" style="flex:1" onclick="wt(-250)">−250</button><button style="flex:1" onclick="wt(250)">+250 ml</button><button style="flex:1" onclick="wt(500)">+500 ml</button></div></div>
  <div class="card"><b>🧮 Calculadora de calorias</b><div class="sub" style="margin:2px 0 8px">Escolha o alimento e a quantidade</div><div class="grid"><input id="cf" list="fl" placeholder="Alimento (ex.: arroz)" oninput="pv()" style="grid-column:1/3"><datalist id="fl">${foodList().map(f=>'<option value="'+esc(f[0])+'">').join('')}</datalist><input id="cq" type="number" inputmode="decimal" placeholder="Quantidade" oninput="pv()"><select id="cu" onchange="pv()"><option value="g">gramas</option><option value="un">unidades</option></select><input id="ck" type="number" inputmode="decimal" placeholder="kcal por 100g (só se não estiver na lista)" style="grid-column:1/3" oninput="pv()"></div><div class="row sp" style="margin-top:8px"><b id="pv" style="color:var(--pri2)">0 kcal</b><button onclick="addD()">+ Adicionar</button></div>${draft.map((d,i)=>'<div class="row sp sub" style="margin:6px 0 0"><span>'+esc(d.n)+' '+esc(d.q)+' · '+d.k+' kcal</span><button class="x" onclick="rmD('+i+')">✕</button></div>').join('')}${draft.length?'<div class="sub" style="margin:8px 0 0">Total: <b style="color:var(--pri2)">'+draft.reduce((a,d)=>a+d.k,0)+' kcal</b> — já preenchido na refeição abaixo.</div>':''}</div>
  <div class="card"><b>Nova refeição</b><div class="grid"><input id="mn" value="${esc(mnv)}" placeholder="Refeição (ex.: Almoço)"><input id="mk" value="${draft.reduce((a,d)=>a+d.k,0)||''}" type="number" inputmode="numeric" placeholder="kcal (opcional)"><input id="mf" value="${esc(draft.map(d=>d.n+' '+d.q).join(', '))}" placeholder="Alimentos (ex.: arroz 150g, frango 120g)" style="grid-column:1/3"></div><button style="width:100%;margin-top:8px" onclick="addM()">Adicionar ao plano</button></div>`;
  if(!ml.length)h+='<div class="empty">Nenhuma refeição no plano ainda.</div>';
@@ -187,14 +190,56 @@ function addM(){const q=i=>document.getElementById(i).value.trim(),n=q('mn');if(
 function tm(id){const m=S.meals.find(x=>x.id===id);if(m.done[TODAY])delete m.done[TODAY];else m.done[TODAY]=1;vib();save();render()}
 function dm(id){S.meals=S.meals.filter(x=>x.id!==id);save();render()}
 
+S.events=S.events||[];let unlocked=false,ad=TODAY;
+async function hp(p){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('pv:'+p));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){let k=0;for(const c of 'pv:'+p)k=(k*31+c.charCodeAt(0))|0;return 'f'+k}}
+function showLock(){if(document.getElementById('lock'))return;const d=document.createElement('div');d.id='lock';d.style.cssText='position:fixed;inset:0;background:var(--bg);z-index:20;display:flex;align-items:center;justify-content:center;padding:24px';d.innerHTML='<div class="card" style="width:100%;max-width:340px;text-align:center;padding:24px"><div style="font-size:40px">🔒</div><h2 style="margin:8px 0 14px">Meu Painel de Vida</h2><input id="lp" type="password" placeholder="Senha" style="text-align:center"><div id="le" class="sub" style="color:#f87171;min-height:20px;margin:8px 0"></div><button style="width:100%" onclick="unlock()">Entrar</button></div>';document.body.appendChild(d);const i=d.querySelector('input');i.onkeydown=e=>{if(e.key=='Enter')unlock()};setTimeout(()=>i.focus(),50)}
+async function unlock(){if(await hp(document.getElementById('lp').value)===S.pin){unlocked=true;document.getElementById('lock').remove();render()}else document.getElementById('le').textContent='Senha incorreta.'}
+async function setPin(rm){if(S.pin&&await hp(document.getElementById('pa').value)!==S.pin)return alert('Senha atual incorreta.');if(rm){delete S.pin;save();render();return alert('Senha removida.')}const n=document.getElementById('pn').value;if(n.length<4)return alert('Use ao menos 4 caracteres.');S.pin=await hp(n);save();unlocked=true;render();alert('Senha ativada.')}
+function lockCard(){return `<div class="card"><b>🔒 Senha de acesso</b><div class="sub">${S.pin?'Ativa: o app pede a senha ao abrir.':'Proteja o app com uma senha neste aparelho.'} É um bloqueio local, não uma conta online. Se esquecer a senha, só limpando os dados do navegador (perdendo tudo), então mantenha o backup em dia.</div>${S.pin?'<input id="pa" type="password" placeholder="Senha atual" style="margin-bottom:8px">':''}<input id="pn" type="password" placeholder="${S.pin?'Nova senha':'Criar senha'} (mín. 4 caracteres)" style="margin-bottom:8px"><div class="row"><button style="flex:1" onclick="setPin(0)">${S.pin?'Alterar':'Ativar'}</button>${S.pin?'<button class="g" style="flex:1" onclick="setPin(1)">Remover</button>':''}</div></div>`}
+function toast(m){const b=document.createElement('div');b.textContent=m;b.style.cssText='position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 12px);background:#8b5cf6;color:#fff;padding:14px 16px;border-radius:14px;font-weight:600;z-index:30;box-shadow:0 8px 30px #8b5cf6aa;animation:p .6s';document.body.appendChild(b);setTimeout(()=>b.remove(),6000)}
+function notify(t,b){toast('⏰ '+t+' — '+b);vib();try{if('Notification' in window&&Notification.permission=='granted'){const o={body:b,icon:'icon-192.png'};if(navigator.serviceWorker)navigator.serviceWorker.getRegistration().then(r=>r?r.showNotification(t,o):new Notification(t,o)).catch(()=>{});else new Notification(t,o)}}catch(e){}}
+function chk(){const now=Date.now();let ch=0;for(const e of S.events){if(e.fired||!e.time||e.rem<0)continue;const at=new Date(e.date+'T'+e.time).getTime();if(now>=at+36e5){e.fired=1;ch=1}else if(now>=at-e.rem*6e4){e.fired=1;ch=1;notify(e.title,e.rem?'Começa em '+(e.rem>=1440?'1 dia':e.rem+' min')+' (às '+e.time+')':'Agora, às '+e.time)}}if(ch)save()}
+setInterval(chk,20000);chk();
+function askN(){try{Notification.requestPermission().then(render)}catch(e){}}
+function agenda(){
+ const key=e=>e.date+(e.time||'00:00'),lbl=ad===TODAY?'Hoje':ad===shift(TODAY,1)?'Amanhã':ad===shift(TODAY,-1)?'Ontem':new Date(ad+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'});
+ const list=S.events.filter(e=>e.date===ad).sort((a,b)=>key(a).localeCompare(key(b))),nx=S.events.filter(e=>e.date>=TODAY&&e.date!==ad&&!e.done).sort((a,b)=>key(a).localeCompare(key(b))).slice(0,5);
+ const perm='Notification' in window?Notification.permission:'x';
+ let h=`<h1>Agenda</h1><div class="sub">Compromissos com horário e lembrete</div>`;
+ if(perm==='default')h+=`<div class="card row sp" style="padding:10px 12px;font-size:13px"><span>🔔 Ative as notificações para receber lembretes</span><button style="min-height:36px" onclick="askN()">Ativar</button></div>`;
+ else if(perm==='denied')h+=`<div class="sub">🔕 Notificações bloqueadas no navegador: os lembretes aparecem só dentro do app.</div>`;
+ h+=`<div class="row sp card"><button class="g" onclick="ad=shift(ad,-1);render()">‹</button><b>${lbl}</b><button class="g" onclick="ad=shift(ad,1);render()">›</button></div>
+ <div class="card"><div class="grid"><input id="et" placeholder="Compromisso (ex.: Dentista)" style="grid-column:1/3" onkeydown="if(event.key=='Enter')addE()"><input id="eh" type="time"><select id="er"><option value="-1">Sem lembrete</option><option value="0">No horário</option><option value="10" selected>10 min antes</option><option value="30">30 min antes</option><option value="60">1 hora antes</option><option value="1440">1 dia antes</option></select></div><button style="width:100%;margin-top:8px" onclick="addE()">Adicionar à agenda</button></div>`;
+ if(!list.length)h+='<div class="empty">Nada marcado para este dia.</div>';
+ for(const e of list)h+=`<div class="card row ${e.done?'done':''}"><button class="chk ${e.done?'on':''}" onclick="te('${e.id}')">${e.done?'✓':''}</button><div class="t"><b style="color:var(--pri2)">${e.time||'Dia todo'}</b> ${esc(e.title)}${e.rem>=0&&e.time?' 🔔':''}</div><button class="x" onclick="delE('${e.id}')">🗑</button></div>`;
+ if(nx.length)h+=`<h2 style="margin:18px 0 8px">Próximos compromissos</h2>`+nx.map(e=>`<div class="card row sp" style="padding:10px 12px"><span class="t">${esc(e.title)}</span><span class="sub" style="margin:0">${e.date.split('-').reverse().slice(0,2).join('/')} ${e.time}</span></div>`).join('');
+ return h+'<div class="sub" style="margin-top:12px">Os lembretes disparam com o app aberto ou em segundo plano. Com o app totalmente fechado o navegador pode não avisar.</div>'}
+function addE(){const t=document.getElementById('et').value.trim();if(!t)return;const hh=document.getElementById('eh').value;let r=+document.getElementById('er').value;if(!hh)r=-1;S.events.push({id:uid(),date:ad,time:hh,title:t,rem:r,done:0});save();render()}
+function te(id){const e=S.events.find(x=>x.id===id);e.done=e.done?0:1;vib();save();render()}
+function delE(id){S.events=S.events.filter(x=>x.id!==id);save();render()}
+function pe(t){return String(t).replace(/[\u{1F000}-\u{1FFFF}\u2600-\u27BF\uFE0F]/gu,'').replace(/[\\()]/g,'\\$&').replace(/[^\x20-\x7e]/g,c=>{const n=c.charCodeAt(0);return n<256?'\\'+n.toString(8).padStart(3,'0'):'?'})}
+function mkpdf(L){const P=[];let c=[],y=800;
+ L.forEach(l=>{const s=l.s||11;if(y<60){P.push(c);c=[];y=800}c.push('BT /'+(l.b?'F2':'F1')+' '+s+' Tf 40 '+y+' Td ('+pe(l.t)+') Tj ET');y-=s+7});P.push(c);
+ const o=[];o[1]='<</Type/Catalog/Pages 2 0 R>>';o[2]='<</Type/Pages/Kids['+P.map((_,i)=>(5+i*2)+' 0 R').join(' ')+']/Count '+P.length+'>>';
+ o[3]='<</Type/Font/Subtype/Type1/BaseFont/Helvetica/Encoding/WinAnsiEncoding>>';o[4]='<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold/Encoding/WinAnsiEncoding>>';
+ P.forEach((p,i)=>{const s=p.join('\n');o[5+i*2]='<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 3 0 R/F2 4 0 R>>>>/Contents '+(6+i*2)+' 0 R>>';o[6+i*2]='<</Length '+s.length+'>>\nstream\n'+s+'\nendstream'});
+ let out='%PDF-1.4\n',off=[];for(let i=1;i<o.length;i++){off[i]=out.length;out+=i+' 0 obj\n'+o[i]+'\nendobj\n'}
+ const x=out.length;out+='xref\n0 '+o.length+'\n0000000000 65535 f \n'+off.slice(1).map(n=>String(n).padStart(10,'0')+' 00000 n \n').join('')+'trailer\n<</Size '+o.length+'/Root 1 0 R>>\nstartxref\n'+x+'\n%%EOF';
+ return new Blob([out],{type:'application/pdf'})}
+function pdfDieta(){const ml=S.meals,L=[{t:'Plano alimentar',s:22,b:1},{t:'Gerado em '+TODAY.split('-').reverse().join('/'),s:10},{t:' ',s:8}];let tot=0;
+ if(!ml.length)L.push({t:'Nenhuma refeição cadastrada.',s:12});
+ ml.forEach((m,i)=>{tot+=m.kcal||0;L.push({t:(i+1)+'. '+m.name+(m.kcal?'  -  '+m.kcal+' kcal':''),s:13,b:1});(m.food||'Sem alimentos informados').split(',').forEach(f=>L.push({t:'     - '+f.trim(),s:11}));L.push({t:' ',s:6})});
+ L.push({t:'Total diário: '+tot+' kcal',s:13,b:1},{t:'Meta de água: '+(S.wgoal||2000)+' ml',s:12});
+ const a=document.createElement('a');a.href=URL.createObjectURL(mkpdf(L));a.download='plano-alimentar.pdf';a.click()}
 function exp(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:'application/json'}));a.download='backup-painel-'+TODAY+'.json';a.click();S.lastBackup=TODAY;save();render()}
-function imp(f){const r=new FileReader();r.onload=()=>{try{S=Object.assign({habits:[],tasks:[],goals:[],workouts:[],meals:[],water:{}},JSON.parse(r.result));save();render()}catch(e){alert('Arquivo inválido.')}};r.readAsText(f)}
-function more(){return `<div class="card"><b>Backup</b><div class="sub">Seus dados ficam só neste aparelho. ${S.lastBackup?'Último backup: '+S.lastBackup.split('-').reverse().join('/')+'.':'Nenhum backup feito ainda.'} Se limpar o navegador, você perde tudo sem ele; guarde o arquivo e use Importar para restaurar.</div><div class="row"><button onclick="exp()">Exportar</button><button class="g" onclick="document.getElementById('f').click()">Importar</button><input id="f" type="file" accept=".json" hidden onchange="imp(this.files[0])"></div><label class="row" style="margin-top:14px"><input type="checkbox" style="width:22px;min-height:22px" ${S.nosound?'':'checked'} onchange="S.nosound=!this.checked;save()"> Som suave ao completar o dia</label></div>`}
+function imp(f){const r=new FileReader();r.onload=()=>{try{S=Object.assign({habits:[],tasks:[],goals:[],workouts:[],meals:[],water:{},events:[]},JSON.parse(r.result));save();render()}catch(e){alert('Arquivo inválido.')}};r.readAsText(f)}
+function more(){return lockCard()+`<div class="card"><b>Backup</b><div class="sub">Seus dados ficam só neste aparelho. ${S.lastBackup?'Último backup: '+S.lastBackup.split('-').reverse().join('/')+'.':'Nenhum backup feito ainda.'} Se limpar o navegador, você perde tudo sem ele; guarde o arquivo e use Importar para restaurar.</div><div class="row"><button onclick="exp()">Exportar</button><button class="g" onclick="document.getElementById('f').click()">Importar</button><input id="f" type="file" accept=".json" hidden onchange="imp(this.files[0])"></div><label class="row" style="margin-top:14px"><input type="checkbox" style="width:22px;min-height:22px" ${S.nosound?'':'checked'} onchange="S.nosound=!this.checked;save()"> Som suave ao completar o dia</label></div>`}
 
 function render(){
+ if(S.pin&&!unlocked){showLock();return}
  const y=scrollY,f=document.activeElement&&document.activeElement.id;
- document.getElementById('app').innerHTML=bk()+({habits,tasks,goals,treinos,dieta,more})[tab]();
- document.getElementById('nav').innerHTML=[['habits','🔥','Hábitos'],['tasks','✅','Tarefas'],['goals','🎯','Metas'],['treinos','💪','Treinos'],['dieta','🥗','Dieta'],['more','⚙️','Backup']].map(n=>`<button class="${tab==n[0]?'on':''}" onclick="go('${n[0]}')"><span>${n[1]}</span>${n[2]}</button>`).join('');
+ document.getElementById('app').innerHTML=bk()+({habits,tasks,agenda,goals,treinos,dieta,more})[tab]();
+ document.getElementById('nav').innerHTML=[['habits','🔥','Hábitos'],['tasks','✅','Tarefas'],['agenda','📅','Agenda'],['goals','🎯','Metas'],['treinos','💪','Treinos'],['dieta','🥗','Dieta'],['more','⚙️','Backup']].map(n=>`<button class="${tab==n[0]?'on':''}" onclick="go('${n[0]}')"><span>${n[1]}</span>${n[2]}</button>`).join('');
  scrollTo(0,y)}
 render();
 </script><script>if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))</script></body></html>
