@@ -422,7 +422,7 @@ function lockCard(){return `<div class="card"><b>{{lock}} Senha de acesso</b><di
 function toast(m){const b=document.createElement('div');b.textContent=m;b.style.cssText='position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 12px);background:var(--pri);color:#fff;padding:14px 16px;border-radius:14px;font-weight:600;z-index:30;box-shadow:0 8px 30px color-mix(in srgb,var(--pri) 67%,transparent);animation:p .6s';document.body.appendChild(b);setTimeout(()=>b.remove(),6000)}
 function notify(t,b,tg){toast(t+' — '+b);vib();try{if('Notification' in window&&Notification.permission=='granted'){const o={body:b,icon:'icon-192.png',tag:tg};if(navigator.serviceWorker)navigator.serviceWorker.getRegistration().then(r=>r?r.showNotification(t,o):new Notification(t,o)).catch(()=>{});else new Notification(t,o)}}catch(e){}}
 function chk(){const now=Date.now();let ch=0;for(const e of S.events){if(e.fired||!e.time||e.rem<0)continue;const at=new Date(e.date+'T'+e.time).getTime();if(now>=at+36e5){e.fired=1;ch=1}else if(now>=at-e.rem*6e4){e.fired=1;ch=1;notify(e.title,e.rem?'Começa em '+(e.rem>=1440?'1 dia':e.rem+' min')+' (às '+e.time+')':'Agora, às '+e.time,'ev-'+e.id)}}if(ch)save()}
-setInterval(chk,20000);chk();
+setInterval(chk,20000);
 function askN(){try{Notification.requestPermission().then(render)}catch(e){}}
 let cm=TODAY.slice(0,7),eid=null;
 function cmv(n){const [y,m]=cm.split('-').map(Number),d=new Date(y,m-1+n,1);cm=d.getFullYear()+'-'+z2(d.getMonth()+1);render()}
@@ -707,17 +707,18 @@ function pushAtivo(){try{return localStorage.getItem(PSK)=='1'&&'Notification' i
 async function pushOn(){
   if(!sess)return err('Entre na sua conta primeiro.');
   if(!('serviceWorker' in navigator)||!('PushManager' in window))return err('Sem suporte a push aqui. No iPhone, instale o app na tela inicial.');
+  let st='permissão';
   try{
     const perm=await Notification.requestPermission();
     if(perm!=='granted')return err('Permissão de notificação negada.');
-    const reg=await navigator.serviceWorker.ready;
-    let sub=await reg.pushManager.getSubscription();
+    st='service worker';const reg=await navigator.serviceWorker.ready;
+    st='inscrição push';let sub=await reg.pushManager.getSubscription();
     if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(VAPID_PUBLIC)});
-    const j=sub.toJSON();
+    st='salvar no Supabase';const j=sub.toJSON();
     await sb('/rest/v1/push_subs?on_conflict=endpoint',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({user_id:sess.user.id,endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth})});
     try{localStorage.setItem(PSK,'1')}catch(e){}
     render();say('Lembretes ativados neste aparelho');
-  }catch(e){err('Não foi possível ativar os lembretes.')}
+  }catch(e){err('Não foi possível ativar os lembretes ('+st+').')}
 }
 
 async function pushOff(){
@@ -841,4 +842,5 @@ function relView(){const {R,a,has}=repRows(rmo),[y,mo]=rmo.split('-').map(Number
  return h+'<button class="g" style="width:100%" onclick="repCsv()">Exportar CSV</button>'}
 applyTheme();render();
 if(!(S.pin&&!unlocked))boot();
+chk();
 </script><script>if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))</script></body></html>
