@@ -59,6 +59,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .toast.ok .ic{color:#4ade80}.toast.bad{border-color:#ef444466}.toast.bad .ic{color:#f87171}
 .done .t{text-decoration:none}.done .t b{text-decoration:line-through;color:var(--mut)}
 nav{left:10px;right:10px;justify-content:flex-start;gap:2px;padding:6px 6px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+nav::before,nav::after{content:'';flex:0 0 calc(50% - 38px)}
 nav button{flex:0 0 auto;width:76px;min-width:76px;scroll-snap-align:center;flex-direction:column;height:58px;min-height:58px;gap:2px;padding:0;font-size:11px;font-weight:600;border-radius:16px;background:none;box-shadow:none;color:var(--mut);white-space:nowrap}
 nav button span{width:48px;height:30px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:22px;transition:background .2s}
 nav button b{display:block;font-weight:600}
@@ -71,7 +72,7 @@ nav button.on span{background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff
 const K='painel-vida-v1';
 let S={habits:[],tasks:[],goals:[],workouts:[],meals:[],water:{},events:[]},tab='home',day=iso(new Date()),dirty=0;
 try{const r=localStorage.getItem(K);if(r){try{S=Object.assign(S,JSON.parse(r))}catch(e){localStorage.setItem(K+'-corrompido',r)}}}catch(e){}
-function save(){try{localStorage.setItem(K,JSON.stringify(S))}catch(e){err('Não foi possível salvar neste aparelho.')}}
+function save(){S._ts=Date.now();try{localStorage.setItem(K,JSON.stringify(S))}catch(e){err('Não foi possível salvar neste aparelho.')}schedPush()}
 function iso(d){const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())}
 function shift(s,n){const d=new Date(s+'T12:00:00');d.setDate(d.getDate()+n);return iso(d)}
 const TODAY=iso(new Date()),uid=()=>Math.random().toString(36).slice(2,9);
@@ -365,7 +366,7 @@ function dm(id){S.meals=S.meals.filter(x=>x.id!==id);save();render()}
 S.events=S.events||[];let unlocked=false,ad=TODAY;
 async function hp(p){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('pv:'+p));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){let k=0;for(const c of 'pv:'+p)k=(k*31+c.charCodeAt(0))|0;return 'f'+k}}
 function showLock(){if(document.getElementById('lock'))return;const d=document.createElement('div');d.id='lock';d.style.cssText='position:fixed;inset:0;background:var(--bg);z-index:20;display:flex;align-items:center;justify-content:center;padding:24px';d.innerHTML='<div class="card" style="width:100%;max-width:340px;text-align:center;padding:24px"><div style="font-size:40px">{{lock}}</div><h2 style="margin:8px 0 14px">Meu Painel de Vida</h2><input id="lp" type="password" placeholder="Senha" style="text-align:center"><div id="le" class="sub" style="color:#f87171;min-height:20px;margin:8px 0"></div><button style="width:100%" onclick="unlock()">Entrar</button></div>';document.body.appendChild(d);const i=d.querySelector('input');i.onkeydown=e=>{if(e.key=='Enter')unlock()};setTimeout(()=>i.focus(),50)}
-async function unlock(){if(await hp(document.getElementById('lp').value)===S.pin){unlocked=true;document.getElementById('lock').remove();render()}else document.getElementById('le').textContent='Senha incorreta.'}
+async function unlock(){if(await hp(document.getElementById('lp').value)===S.pin){unlocked=true;document.getElementById('lock').remove();render();boot()}else document.getElementById('le').textContent='Senha incorreta.'}
 async function setPin(rm){if(S.pin&&await hp(document.getElementById('pa').value)!==S.pin)return err('Senha atual incorreta.');if(rm){delete S.pin;save();render();return say('Senha removida.')}const n=document.getElementById('pn').value;if(n.length<4)return err('Use ao menos 4 caracteres.');S.pin=await hp(n);save();unlocked=true;render();say('Senha ativada.')}
 function lockCard(){return `<div class="card"><b>{{lock}} Senha de acesso</b><div class="sub">${S.pin?'Ativa: o app pede a senha ao abrir.':'Proteja o app com uma senha neste aparelho.'} É um bloqueio local, não uma conta online. Se esquecer a senha, só limpando os dados do navegador (perdendo tudo), então mantenha o backup em dia.</div>${S.pin?'<input id="pa" type="password" placeholder="Senha atual" style="margin-bottom:8px">':''}<input id="pn" type="password" placeholder="${S.pin?'Nova senha':'Criar senha'} (mín. 4 caracteres)" style="margin-bottom:8px"><div class="row"><button style="flex:1" onclick="setPin(0)">${S.pin?'Alterar':'Ativar'}</button>${S.pin?'<button class="g" style="flex:1" onclick="setPin(1)">Remover</button>':''}</div></div>`}
 function toast(m){const b=document.createElement('div');b.textContent=m;b.style.cssText='position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 12px);background:#8b5cf6;color:#fff;padding:14px 16px;border-radius:14px;font-weight:600;z-index:30;box-shadow:0 8px 30px #8b5cf6aa;animation:p .6s';document.body.appendChild(b);setTimeout(()=>b.remove(),6000)}
@@ -507,7 +508,7 @@ function home(){
  h+=sec('Finanças do mês','Abrir','fin')+`<div class="card"><div class="sub" style="margin:0">Saldo</div><div style="font-size:24px;font-weight:800;color:${ei-eo>=0?'var(--tx)':'#f87171'}">${brl(ei-eo)}</div><div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><span class="chip ok">{{up}} ${brl(ei)}</span><span class="chip bad">{{down}} ${brl(eo)}</span></div></div>`;
  h+=sec('Atalhos')+`<div class="grid">${[['plus','Nova tarefa',"go('tasks');setTimeout(()=>{const i=document.getElementById('tn');i&&i.focus()},60)"],['cal','Novo compromisso',"agv='dia';go('agenda');setTimeout(()=>{const d=document.querySelector('details');if(d)d.open=true},60)"],['wallet','Registrar gasto',"fid=null;fdr=null;ftype='out';sub.fin='novo';go('fin')"],['utensils','Registrar refeição',"sub.dieta='hoje';go('dieta')"]].map(a=>`<button class="tile" onclick="${a[2]}"><div class="ib">{{${a[0]}}}</div>${a[1]}</button>`).join('')}</div>`;
  return h}
-function cfg(){return `<h1>Configurações</h1><div class="sub">Preferências e segurança</div><div class="card"><b>Seu nome</b><div class="sub" style="margin:2px 0 8px">Usado na saudação da tela inicial.</div><input value="${esc(S.name||'')}" placeholder="Como quer ser chamado" maxlength="30" onchange="S.name=this.value.trim();save();say('Nome salvo')"></div>`+cfgOld()}
+function cfg(){return `<h1>Configurações</h1><div class="sub">Preferências e segurança</div><div class="card"><b>Seu nome</b><div class="sub" style="margin:2px 0 8px">Usado na saudação da tela inicial.</div><input value="${esc(S.name||'')}" placeholder="Como quer ser chamado" maxlength="30" onchange="S.name=this.value.trim();save();say('Nome salvo')"></div>`+accountCard()+cfgOld()}
 function go(t){tab=t;render();const a=document.getElementById('app');a.classList.remove('fi');void a.offsetWidth;a.classList.add('fi');scrollTo(0,0)}
 function fcmp(ei,eo){const [y,m]=fm.split('-').map(Number),d=new Date(y,m-2,1),pm=d.getFullYear()+'-'+z2(d.getMonth()+1),P=S.fin.filter(t=>t.date.startsWith(pm)),pi=fsum(P,'in'),po=fsum(P,'out');if(!pi&&!po)return '';
  const dl=(a,b,bad)=>{if(!b)return '';const p=Math.round((a-b)/b*100);return `<span class="chip ${p==0?'':((p>0)==bad?'bad':'ok')}">${p>0?'+':''}${p}%</span>`};
@@ -536,5 +537,126 @@ function render(){
  nav.innerHTML=ico(NAV.map(n=>`<button class="${tab==n[0]?'on':''}" aria-label="${n[2]}" ${tab==n[0]?'aria-current="page"':''} onclick="go('${n[0]}')"><span>{{${n[1]}}}</span><b>${n[2]}</b></button>`).join(''));
  centerNav(prev);
  scrollTo(0,y)}
+/* ===== Conta e sincronização (Supabase via REST, sem bibliotecas) ===== */
+const SB='https://pcalibndykgrvaaoqqfz.supabase.co',SK='sb_publishable_VoWKdxkKkryEF-LKWWfjkg_K4PAnz_W',SSK='painel-sessao',VK='painel-vinculo',PK='painel-sem-conta';
+let sess=null,syncSt='off',pushT=null,syncing=false,lastSync=0,refP=null,recTok=null;
+try{sess=JSON.parse(localStorage.getItem(SSK)||'null')}catch(e){}
+if(sess)syncSt='sync';
+function setSess(x){sess=x;try{x?localStorage.setItem(SSK,JSON.stringify(x)):localStorage.removeItem(SSK)}catch(e){}}
+function mkSess(j){return{access_token:j.access_token,refresh_token:j.refresh_token,expires_at:j.expires_at||Math.floor(Date.now()/1000)+(j.expires_in||3600),user:{id:j.user.id,email:j.user.email}}}
+function errMsg(j,st){const t=String((j&&(j.error_code||j.msg||j.error_description||j.message||j.error))||'');
+ if(/invalid_credentials|Invalid login/i.test(t))return 'E-mail ou senha incorretos.';
+ if(/user_already_exists|already registered/i.test(t))return 'Este e-mail já tem conta. Toque em Entrar.';
+ if(/weak_password|at least/i.test(t))return 'A senha precisa ter ao menos 6 caracteres.';
+ if(/email_not_confirmed/i.test(t))return 'Confirme seu e-mail (veja a caixa de entrada) e depois entre.';
+ if(/rate_limit|too many/i.test(t))return 'Muitas tentativas. Aguarde um pouco e tente de novo.';
+ if(/email_address_invalid|invalid.*email/i.test(t))return 'Confira o e-mail digitado.';
+ if(/same_password/i.test(t))return 'Use uma senha diferente da anterior.';
+ return 'Não foi possível concluir ('+(st||'erro')+'). Tente de novo.'}
+async function authCall(path,body,tok,method){
+ let r;try{r=await fetch(SB+path,{method:method||'POST',headers:{apikey:SK,'Content-Type':'application/json',Authorization:'Bearer '+(tok||SK)},body:JSON.stringify(body)})}catch(e){throw new Error('Sem conexão com a internet.')}
+ const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(errMsg(j,r.status));return j}
+async function refresh(){
+ let r;try{r=await fetch(SB+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{apikey:SK,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:sess.refresh_token})})}catch(e){throw new Error('net')}
+ const j=await r.json().catch(()=>({}));
+ if(!r.ok){if(r.status>=400&&r.status<500){setSess(null);setSt('off');showLogin('Sua sessão expirou. Entre de novo.');throw new Error('auth')}throw new Error('net')}
+ setSess(mkSess(j))}
+function refreshOnce(){return refP=refP||refresh().finally(()=>{refP=null})}
+async function sb(path,opt){
+ if(!sess)throw new Error('auth');
+ if(sess.expires_at*1000-Date.now()<60000)await refreshOnce();
+ for(let t=0;t<2;t++){
+  const h=Object.assign({apikey:SK,Authorization:'Bearer '+sess.access_token,'Content-Type':'application/json'},opt&&opt.headers);
+  let r;try{r=await fetch(SB+path,Object.assign({},opt,{headers:h}))}catch(e){throw new Error('net')}
+  if(r.status==401&&t==0){await refreshOnce();continue}
+  if(!r.ok)throw new Error('http'+r.status);
+  const x=await r.text();return x?JSON.parse(x):null}}
+function stTxt(){return({off:'Sem conta conectada',pend:'Salvando…',sync:'Sincronizando…',ok:'Sincronizado'+(lastSync?' às '+new Date(lastSync).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''),err:'Sem conexão: será enviado quando a internet voltar'})[syncSt]}
+function setSt(s){syncSt=s;const e=document.getElementById('sst');if(e)e.textContent=stTxt()}
+function hasData(){return['habits','tasks','goals','workouts','meals','events','fin','diary'].some(k=>S[k]&&S[k].length)||Object.keys(S.water||{}).length>0}
+function applyCloud(c){const pin=S.pin;S=Object.assign({habits:[],tasks:[],goals:[],workouts:[],meals:[],water:{},events:[]},c);if(pin)S.pin=pin;else delete S.pin;try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}render()}
+async function push(){
+ const d=Object.assign({},S);delete d.pin;if(!d._ts)d._ts=S._ts=Date.now();
+ const body=JSON.stringify({user_id:sess.user.id,data:d,updated_at:new Date().toISOString()});
+ await sb('/rest/v1/painel_dados?on_conflict=user_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body,keepalive:body.length<60000});
+ try{localStorage.setItem(VK,sess.user.id)}catch(e){}}
+async function syncNow(manual){
+ if(!sess||syncing)return;
+ if(!navigator.onLine){setSt('err');if(manual)err('Sem internet agora.');return}
+ syncing=true;clearTimeout(pushT);pushT=null;setSt('sync');
+ try{
+  const rows=await sb('/rest/v1/painel_dados?select=data&user_id=eq.'+sess.user.id);
+  const c=rows&&rows[0]&&rows[0].data,ct=c?+c._ts||0:0,lt=+S._ts||0;
+  let linked=false;try{linked=localStorage.getItem(VK)==sess.user.id}catch(e){}
+  if(!c)await push();
+  else if(!linked){
+   if(!hasData())applyCloud(c);
+   else if(ct&&confirm('Encontrei dados salvos na sua conta e também dados neste aparelho.\n\nOK = usar os da conta (substitui os deste aparelho)\nCancelar = manter os deste aparelho (substitui os da conta)'))applyCloud(c);
+   else await push();
+  }else if(ct>lt)applyCloud(c);
+  else if(lt>ct)await push();
+  try{localStorage.setItem(VK,sess.user.id)}catch(e){}
+  lastSync=Date.now();setSt('ok');if(manual)say('Tudo sincronizado');
+ }catch(e){if(sess){setSt('err');if(manual)err('Não consegui sincronizar. Tente de novo.')}}
+ finally{syncing=false}}
+function schedPush(){if(!sess)return;setSt('pend');clearTimeout(pushT);pushT=setTimeout(doPush,2500)}
+async function doPush(){
+ clearTimeout(pushT);pushT=null;if(!sess)return;
+ if(syncing){pushT=setTimeout(doPush,1500);return}
+ let linked=false;try{linked=localStorage.getItem(VK)==sess.user.id}catch(e){}
+ if(!linked)return syncNow();
+ if(!navigator.onLine){setSt('err');return}
+ syncing=true;setSt('sync');
+ try{await push();lastSync=Date.now();setSt('ok')}catch(e){if(sess)setSt('err')}
+ finally{syncing=false}}
+addEventListener('online',()=>{if(sess)syncNow()});
+document.addEventListener('visibilitychange',()=>{if(!sess)return;if(document.hidden){if(pushT)doPush()}else syncNow()});
+addEventListener('pagehide',()=>{if(sess&&pushT)doPush()});
+
+function loginBox(inner){const d=document.createElement('div');d.style.cssText='position:fixed;inset:0;background:var(--bg);z-index:25;display:flex;align-items:center;justify-content:center;padding:24px;overflow:auto';d.innerHTML=ico('<div class="card" style="width:100%;max-width:360px;padding:24px;margin:0">'+inner+'</div>');document.body.appendChild(d);return d}
+function showLogin(msg){
+ let o=document.getElementById('login');
+ if(!o){o=loginBox('<div style="text-align:center;font-size:40px">{{habits}}</div><h2 style="text-align:center;margin:8px 0 4px">Meu Painel de Vida</h2><div class="sub" style="text-align:center;margin-bottom:16px">Entre para salvar seus dados na nuvem e usar em mais de um aparelho.</div><input id="lgm" type="email" inputmode="email" autocomplete="username" autocapitalize="none" autocorrect="off" placeholder="E-mail" style="margin-bottom:8px"><input id="lgp" type="password" autocomplete="current-password" placeholder="Senha (mín. 6 caracteres)"><div id="lge" class="sub" style="color:#f87171;min-height:20px;margin:8px 0"></div><button style="width:100%;margin-bottom:8px" onclick="doAuth(\'in\')">Entrar</button><button class="g" style="width:100%;margin-bottom:8px" onclick="doAuth(\'up\')">Criar conta</button><div class="row sp"><button class="x" onclick="forgot()">Esqueci a senha</button><button class="x" onclick="skipLogin()">Agora não</button></div>');o.id='login';
+  o.querySelector('#lgp').onkeydown=e=>{if(e.key=='Enter')doAuth('in')};setTimeout(()=>o.querySelector('#lgm').focus(),50)}
+ if(msg){const e=o.querySelector('#lge');e.style.color='#f87171';e.textContent=msg}}
+function skipLogin(){try{localStorage.setItem(PK,'1')}catch(e){}const o=document.getElementById('login');if(o)o.remove()}
+async function doAuth(k){
+ const m=document.getElementById('lgm').value.trim(),p=document.getElementById('lgp').value,e=document.getElementById('lge'),bs=document.querySelectorAll('#login button');
+ e.style.color='#f87171';
+ if(!/^\S+@\S+\.\S+$/.test(m)){e.textContent='Digite um e-mail válido.';return}
+ if(p.length<6){e.textContent='A senha precisa ter ao menos 6 caracteres.';return}
+ bs.forEach(b=>b.disabled=true);e.style.color='var(--mut)';e.textContent='Aguarde…';
+ try{
+  const j=await authCall(k=='up'?'/auth/v1/signup':'/auth/v1/token?grant_type=password',{email:m,password:p});
+  if(!j.access_token){e.style.color='#4ade80';e.textContent='Conta criada! Confirme o e-mail que enviamos e depois toque em Entrar.';bs.forEach(b=>b.disabled=false);return}
+  setSess(mkSess(j));try{localStorage.removeItem(PK)}catch(x){}
+  document.getElementById('login').remove();say('Conta conectada');await syncNow();render();
+ }catch(x){e.style.color='#f87171';e.textContent=x.message;bs.forEach(b=>b.disabled=false)}}
+async function forgot(){
+ const m=document.getElementById('lgm').value.trim(),e=document.getElementById('lge');
+ if(!/^\S+@\S+\.\S+$/.test(m)){e.style.color='#f87171';e.textContent='Digite seu e-mail acima primeiro.';return}
+ try{await authCall('/auth/v1/recover',{email:m});e.style.color='#4ade80';e.textContent='Enviamos um link de recuperação para o seu e-mail.'}catch(x){e.style.color='#f87171';e.textContent=x.message}}
+function checkRecovery(){
+ const h=new URLSearchParams(location.hash.slice(1));
+ if(h.get('type')!=='recovery'||!h.get('access_token'))return false;
+ recTok=h.get('access_token');history.replaceState(null,'',location.pathname+location.search);
+ const o=loginBox('<h2 style="text-align:center;margin:0 0 4px">Nova senha</h2><div class="sub" style="text-align:center;margin-bottom:16px">Escolha a nova senha da sua conta.</div><input id="nps" type="password" autocomplete="new-password" placeholder="Nova senha (mín. 6 caracteres)"><div id="npe" class="sub" style="color:#f87171;min-height:20px;margin:8px 0"></div><button style="width:100%" onclick="saveNewPass()">Salvar senha</button>');o.id='newpass';return true}
+async function saveNewPass(){
+ const p=document.getElementById('nps').value,e=document.getElementById('npe');
+ if(p.length<6){e.textContent='A senha precisa ter ao menos 6 caracteres.';return}
+ try{await authCall('/auth/v1/user',{password:p},recTok,'PUT');recTok=null;document.getElementById('newpass').remove();showLogin();const l=document.getElementById('lge');l.style.color='#4ade80';l.textContent='Senha alterada. Entre com a nova senha.'}catch(x){e.textContent=x.message}}
+function accountCard(){
+ if(sess)return `<div class="card"><b>{{save}} Conta</b><div class="sub" style="margin:2px 0 8px">${esc(sess.user.email)}</div><div class="row" style="margin-bottom:10px"><span class="chip ok" id="sst">${stTxt()}</span></div><div class="sub">Seus dados são salvos sozinhos neste aparelho e na nuvem, e aparecem em qualquer aparelho onde você entrar.</div><div class="row"><button style="flex:1" onclick="syncNow(1)">Sincronizar agora</button><button class="g" style="flex:1" onclick="logout()">Sair</button></div></div>`;
+ return `<div class="card"><b>{{save}} Conta</b><div class="sub">Sem conta, seus dados ficam só neste aparelho. Entre para salvar na nuvem e usar em vários aparelhos.</div><button style="width:100%" onclick="try{localStorage.removeItem(PK)}catch(e){};showLogin()">Entrar ou criar conta</button></div>`}
+async function logout(){
+ if(!confirm('Sair da conta? Seus dados continuam salvos neste aparelho e na nuvem.'))return;
+ if(pushT){try{await doPush()}catch(e){}}
+ setSess(null);try{localStorage.removeItem(VK);localStorage.setItem(PK,'1')}catch(e){}
+ setSt('off');render();say('Você saiu da conta')}
+function boot(){
+ if(checkRecovery())return;
+ if(sess)syncNow();
+ else{let sk=0;try{sk=localStorage.getItem(PK)}catch(e){}if(!sk)showLogin()}}
 render();
+if(!(S.pin&&!unlocked))boot();
 </script><script>if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))</script></body></html>
