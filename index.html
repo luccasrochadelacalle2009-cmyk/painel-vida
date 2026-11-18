@@ -420,8 +420,8 @@ async function unlock(){if(await hp(document.getElementById('lp').value)===S.pin
 async function setPin(rm){if(S.pin&&await hp(document.getElementById('pa').value)!==S.pin)return err('Senha atual incorreta.');if(rm){delete S.pin;save();render();return say('Senha removida.')}const n=document.getElementById('pn').value;if(n.length<4)return err('Use ao menos 4 caracteres.');S.pin=await hp(n);save();unlocked=true;render();say('Senha ativada.')}
 function lockCard(){return `<div class="card"><b>{{lock}} Senha de acesso</b><div class="sub">${S.pin?'Ativa: o app pede a senha ao abrir.':'Proteja o app com uma senha neste aparelho.'} É um bloqueio local, não uma conta online. Se esquecer a senha, só limpando os dados do navegador (perdendo tudo), então mantenha o backup em dia.</div>${S.pin?'<input id="pa" type="password" placeholder="Senha atual" style="margin-bottom:8px">':''}<input id="pn" type="password" placeholder="${S.pin?'Nova senha':'Criar senha'} (mín. 4 caracteres)" style="margin-bottom:8px"><div class="row"><button style="flex:1" onclick="setPin(0)">${S.pin?'Alterar':'Ativar'}</button>${S.pin?'<button class="g" style="flex:1" onclick="setPin(1)">Remover</button>':''}</div></div>`}
 function toast(m){const b=document.createElement('div');b.textContent=m;b.style.cssText='position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 12px);background:var(--pri);color:#fff;padding:14px 16px;border-radius:14px;font-weight:600;z-index:30;box-shadow:0 8px 30px color-mix(in srgb,var(--pri) 67%,transparent);animation:p .6s';document.body.appendChild(b);setTimeout(()=>b.remove(),6000)}
-function notify(t,b){toast(t+' — '+b);vib();try{if('Notification' in window&&Notification.permission=='granted'){const o={body:b,icon:'icon-192.png'};if(navigator.serviceWorker)navigator.serviceWorker.getRegistration().then(r=>r?r.showNotification(t,o):new Notification(t,o)).catch(()=>{});else new Notification(t,o)}}catch(e){}}
-function chk(){const now=Date.now();let ch=0;for(const e of S.events){if(e.fired||!e.time||e.rem<0)continue;const at=new Date(e.date+'T'+e.time).getTime();if(now>=at+36e5){e.fired=1;ch=1}else if(now>=at-e.rem*6e4){e.fired=1;ch=1;notify(e.title,e.rem?'Começa em '+(e.rem>=1440?'1 dia':e.rem+' min')+' (às '+e.time+')':'Agora, às '+e.time)}}if(ch)save()}
+function notify(t,b,tg){toast(t+' — '+b);vib();try{if('Notification' in window&&Notification.permission=='granted'){const o={body:b,icon:'icon-192.png',tag:tg};if(navigator.serviceWorker)navigator.serviceWorker.getRegistration().then(r=>r?r.showNotification(t,o):new Notification(t,o)).catch(()=>{});else new Notification(t,o)}}catch(e){}}
+function chk(){const now=Date.now();let ch=0;for(const e of S.events){if(e.fired||!e.time||e.rem<0)continue;const at=new Date(e.date+'T'+e.time).getTime();if(now>=at+36e5){e.fired=1;ch=1}else if(now>=at-e.rem*6e4){e.fired=1;ch=1;notify(e.title,e.rem?'Começa em '+(e.rem>=1440?'1 dia':e.rem+' min')+' (às '+e.time+')':'Agora, às '+e.time,'ev-'+e.id)}}if(ch)save()}
 setInterval(chk,20000);chk();
 function askN(){try{Notification.requestPermission().then(render)}catch(e){}}
 let cm=TODAY.slice(0,7),eid=null;
@@ -561,7 +561,7 @@ function home(){
  const P=h.split('</section><section class="hs" data-w="'),hero=P.shift(),W={};P.forEach(x=>{const i=x.indexOf('">');W[x.slice(0,i)]=x.slice(i+2)});
  const hid=(S.dash&&S.dash.hidden)||[];
  return `<div class="hgrid"><section class="hs hero">${hero}</section>${dOrder().filter(i=>W[i]&&!hid.includes(i)).map(i=>`<section class="hs">${W[i]}</section>`).join('')}</div>`}
-function cfg(){return `<h1>Configurações</h1><div class="sub">Preferências e segurança</div><div class="card"><b>Seu nome</b><div class="sub" style="margin:2px 0 8px">Usado na saudação da tela inicial.</div><input value="${esc(S.name||'')}" placeholder="Como quer ser chamado" maxlength="30" onchange="S.name=this.value.trim();save();say('Nome salvo')"></div>`+appearCard()+accountCard()+cfgOld()}
+function cfg(){return `<h1>Configurações</h1><div class="sub">Preferências e segurança</div><div class="card"><b>Seu nome</b><div class="sub" style="margin:2px 0 8px">Usado na saudação da tela inicial.</div><input value="${esc(S.name||'')}" placeholder="Como quer ser chamado" maxlength="30" onchange="S.name=this.value.trim();save();say('Nome salvo')"></div>`+appearCard()+accountCard()+pushCard()+cfgOld()}
 function go(t){tab=t;render();const a=document.getElementById('app');a.classList.remove('fi');void a.offsetWidth;a.classList.add('fi');scrollTo(0,0)}
 function fcmp(ei,eo){const [y,m]=fm.split('-').map(Number),d=new Date(y,m-2,1),pm=d.getFullYear()+'-'+z2(d.getMonth()+1),P=S.fin.filter(t=>t.date.startsWith(pm)),pi=fsum(P,'in'),po=fsum(P,'out');if(!pi&&!po)return '';
  const dl=(a,b,bad)=>{if(!b)return '';const p=Math.round((a-b)/b*100);return `<span class="chip ${p==0?'':((p>0)==bad?'bad':'ok')}">${p>0?'+':''}${p}%</span>`};
@@ -698,6 +698,41 @@ async function saveNewPass(){
  const p=document.getElementById('nps').value,e=document.getElementById('npe');
  if(p.length<6){e.textContent='A senha precisa ter ao menos 6 caracteres.';return}
  try{await authCall('/auth/v1/user',{password:p},recTok,'PUT');recTok=null;document.getElementById('newpass').remove();showLogin();const l=document.getElementById('lge');l.style.color='#4ade80';l.textContent='Senha alterada. Entre com a nova senha.'}catch(x){e.textContent=x.message}}
+const VAPID_PUBLIC='BCvfzGNpW2s6ZmeZ-OjHbk5UhQ2cn8xqmWYISTdiABO4z6h397fQol6cdpHCcggm9RCP1lIObt4gG73dlHc5Cxw',PSK='painel-push';
+
+function b64u(s){const p='='.repeat((4-s.length%4)%4),b=(s+p).replace(/-/g,'+').replace(/_/g,'/'),r=atob(b);return Uint8Array.from([...r].map(c=>c.charCodeAt(0)))}
+
+function pushAtivo(){try{return localStorage.getItem(PSK)=='1'&&'Notification' in window&&Notification.permission=='granted'}catch(e){return false}}
+
+async function pushOn(){
+  if(!sess)return err('Entre na sua conta primeiro.');
+  if(!('serviceWorker' in navigator)||!('PushManager' in window))return err('Sem suporte a push aqui. No iPhone, instale o app na tela inicial.');
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted')return err('Permissão de notificação negada.');
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(VAPID_PUBLIC)});
+    const j=sub.toJSON();
+    await sb('/rest/v1/push_subs?on_conflict=endpoint',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({user_id:sess.user.id,endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth})});
+    try{localStorage.setItem(PSK,'1')}catch(e){}
+    render();say('Lembretes ativados neste aparelho');
+  }catch(e){err('Não foi possível ativar os lembretes.')}
+}
+
+async function pushOff(){
+  try{
+    const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();
+    if(sub){const ep=sub.endpoint;await sub.unsubscribe();if(sess)await sb('/rest/v1/push_subs?endpoint=eq.'+encodeURIComponent(ep),{method:'DELETE'})}
+    try{localStorage.removeItem(PSK)}catch(e){}
+    render();say('Lembretes desativados neste aparelho');
+  }catch(e){err('Não foi possível desativar.')}
+}
+
+function pushCard(){
+  const on=pushAtivo(),den='Notification' in window&&Notification.permission=='denied';
+  return `<div class="card"><b>{{bell}} Lembretes com o app fechado</b><div class="sub" style="margin:2px 0 8px">${!sess?'Entre na sua conta para ativar.':den?'Notificações bloqueadas no navegador. Libere nas configurações do site/app.':on?'Ativado neste aparelho. Você recebe os lembretes da Agenda mesmo com o app fechado.':'Receba os lembretes da Agenda mesmo com o app fechado. No iPhone, o app precisa estar instalado na tela inicial.'}</div>${on?'<button class="g" style="width:100%" onclick="pushOff()">Desativar neste aparelho</button>':`<button style="width:100%" ${sess&&!den?'':'disabled'} onclick="pushOn()">Ativar lembretes</button>`}</div>`}
+
 function accountCard(){
  if(sess)return `<div class="card"><b>{{save}} Conta</b><div class="sub" style="margin:2px 0 8px">${esc(sess.user.email)}</div><div class="row" style="margin-bottom:10px"><span class="chip ok" id="sst">${stTxt()}</span></div><div class="sub">Seus dados são salvos sozinhos neste aparelho e na nuvem, e aparecem em qualquer aparelho onde você entrar.</div><div class="row"><button style="flex:1" onclick="syncNow(1)">Sincronizar agora</button><button class="g" style="flex:1" onclick="logout()">Sair</button></div></div>`;
  return `<div class="card"><b>{{save}} Conta</b><div class="sub">Sem conta, seus dados ficam só neste aparelho. Entre para salvar na nuvem e usar em vários aparelhos.</div><button style="width:100%" onclick="try{localStorage.removeItem(PK)}catch(e){};showLogin()">Entrar ou criar conta</button></div>`}
